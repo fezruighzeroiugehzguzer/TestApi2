@@ -20,10 +20,52 @@ let lastSkipHTML = ""; // Pour garder la réponse du dernier skip
 const $ = s => document.querySelector(s);
 
 // ====== THEMES ET LANGUES ======
-// (tu gardes ton objet THEMES et LANGUAGES ici, inchangé)
+const THEMES = {
+    "classic": { accent: "#0069ff", bg: "#f8f8ff", text: "#222", accent2: "#ff0066", success: "#00b65c", danger: "#d90000", fg: "#222" },
+    "rose":    { accent: "#ff0066", bg: "#fff0fa", text: "#222", accent2: "#0069ff", success: "#00b65c", danger: "#d90000", fg: "#222" },
+    "vert":    { accent: "#00b65c", bg: "#f7fff0", text: "#222", accent2: "#0069ff", success: "#ff0066", danger: "#d90000", fg: "#222" }
+};
 
-const THEMES = { /* ... comme avant ... */ };
-const LANGUAGES = { /* ... comme avant ... */ };
+const LANGUAGES = {
+    "fr": {
+        name: "Français",
+        placeholder: "Entrez un mot...",
+        rules: "Tapez un mot contenant la syllabe affichée.",
+        subs: "Syllabes",
+        words: "Mots",
+        score: "Score",
+        time: "Temps",
+        noneList: "Aucune syllabe trouvée",
+        change: "Change le mode/difficulté ou ta liste de mots.",
+        syllabe: "Syllabe",
+        feedback: {
+            correct: "Bien joué !",
+            already: "Mot déjà trouvé.",
+            short: "Mot trop court.",
+            notfound: "Mot non trouvé dans le dictionnaire.",
+            missing: "La syllabe n'est pas présente dans ce mot.",
+            empty: "Veuillez entrer un mot."
+        },
+        terminee: "Bravo ! Partie terminée 🎉",
+        found: "Mot trouvé :",
+        none: "Mot incorrect ou absent !",
+        reponses: "Réponses pour",
+        botw: "Quelques mots pour",
+        botnone: "Aucun mot trouvé pour",
+        bothelp: "Utilisez /c <syllabe> pour chercher des mots.",
+        botex: "Exemple : /c an",
+        botdesc: "Je peux te donner des mots pour une syllabe !",
+        botmore: "+{n} autres mots",
+        noHist: "Pas d'historique",
+        casual_lives: "vies restantes",
+        casual_life: "vie restante",
+        casual_stats: "Statistiques",
+        casual_lost: "Syllabes perdues",
+        casual_deadsylls: "Syllabes mortes",
+        subs: "Syllabes",
+        words: "Mots",
+    }
+};
 
 let currentLang = "fr";
 let currentTheme = "classic";
@@ -33,8 +75,15 @@ function t(key, vars={}) {
     for (const k in vars) str = str.replaceAll("{"+k+"}",vars[k]);
     return str;
 }
-// setTheme, setLang, buildThemeDropdown, buildLangDropdown sont inchangés
-// ...
+function setTheme(theme) {
+    const t = THEMES[theme] || THEMES.classic;
+    Object.keys(t).forEach(k => document.documentElement.style.setProperty('--'+k, t[k]));
+}
+function setLang(lang) {
+    currentLang = lang;
+    $("#guess-input").placeholder = LANGUAGES[lang].placeholder;
+    $("#rules").textContent = LANGUAGES[lang].rules;
+}
 
 // ================= SYLLABES ===================
 // On retire la liste locale des mots, la recherche se fait via l'API
@@ -50,12 +99,17 @@ function getWordsFromAPI(syllabe, callback) {
       .then(data => callback(data.mots || []));
 }
 
+// *** MODIFICATION PRINCIPALE ***
+// Utilise l'API pour récupérer dynamiquement le pool de syllabes
+function getSyllablesPool(lang="fr", callback) {
+    fetch('/api/syllabes')
+      .then(r => r.json())
+      .then(data => callback(data.syllabes || []));
+}
+
 // ========== UI & INTERACTIONS ==========
 
-// Les fonctions d'affichage restent similaires
-
 function showStats() {
-    // Tu peux adapter ici si tu veux afficher le nombre de mots/syllabes
     $("#total-subs").textContent = `${t("subs")}: ?`;
     $("#total-mots").textContent = `${t("words")}: ?`;
     $("#session-score").textContent = `${t("score")}: ${sessionScore}`;
@@ -73,26 +127,13 @@ function updateProgress() {
     }
 }
 
-// Nouveau : génère les syllabes à partir de la langue (ou d'une liste custom si importée)
-function getSyllablesPool(lang="fr", callback) {
-    // Simple exemple : génère des syllabes courantes
-    // Tu peux adapter pour avoir une liste plus complète ou dynamique
-    let syllabes = [
-        "an", "em", "ar", "ta", "de", "la", "me", "re", "on", "te",
-        "ma", "da", "li", "ou", "ne", "na", "le", "el", "ri", "en"
-    ];
-    callback(syllabes);
-}
-
 function pickSubs(mode, callback) {
     getSyllablesPool(currentLang, syllabes => {
         let subs = [];
         if (mode === "subX") {
-            // Sélectionne les syllabes du pool
             subs = syllabes.map(syll => ({syll}));
         }
         if (mode === "sub50") {
-            // Pick random syllabe
             const idx = Math.floor(Math.random() * syllabes.length);
             subs = [ {syll: syllabes[idx]} ];
         }
@@ -370,7 +411,6 @@ function showHistory() {
 }
 
 // ========== MODE CASUAL (Min 1, Bombparty style) ==========
-// (même principe, on utilise l'API pour charger les mots)
 
 let casualLives = 2;
 let casualMaxLives = 3;
